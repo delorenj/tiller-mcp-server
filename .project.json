@@ -1,0 +1,14 @@
+{
+  "project_name": "Tiller Mcp Server",
+  "project_description": "",
+  "project_slug": "tiller-mcp-server",
+  "repo_path": "/home/delorenj/code/tiller-mcp-server",
+  "ticket_provider": {
+    "type": "plane",
+    "workspace": "",
+    "identifier": "",
+    "board_id": "",
+    "board_url": ""
+  },
+  "agents": {}
+}

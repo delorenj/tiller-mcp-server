@@ -8,7 +8,8 @@ stored in Tiller Money Google Sheets.
 import json
 import logging
 import os
-from typing import Optional
+import sys
+
 from dotenv import load_dotenv
 
 # MCP imports
@@ -16,25 +17,25 @@ from mcp.server.fastmcp import FastMCP
 
 # Local imports - handle both direct execution and module import
 try:
-    from .sheets_client import get_sheets_client, SheetsClientError
-    from .tiller_schema import Account, Transaction, Category
+    from .sheets_client import SheetsClientError, get_sheets_client
+    from .tiller_schema import Account, Category, Transaction
 except ImportError:
     # Running as script directly, not as module
     import sys
     from pathlib import Path
+
     # Add src directory to path
     src_path = Path(__file__).parent.parent
     sys.path.insert(0, str(src_path))
-    from tiller_mcp_server.sheets_client import get_sheets_client, SheetsClientError
-    from tiller_mcp_server.tiller_schema import Account, Transaction, Category
+    from tiller_mcp_server.sheets_client import SheetsClientError, get_sheets_client
+    from tiller_mcp_server.tiller_schema import Account, Category, Transaction
 
 # Load environment variables from .env file (for local testing)
 load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -48,9 +49,7 @@ except Exception as e:
 
 
 @mcp.tool()
-def get_accounts(
-    account_type: Optional[str] = None
-) -> str:
+def get_accounts(account_type: str | None = None) -> str:
     """
     Get all active financial accounts from Tiller Money.
 
@@ -71,8 +70,8 @@ def get_accounts(
 
     Examples:
         get_accounts()  # Returns all active accounts
-        get_accounts(account_type="Credit Cards")  # Returns only credit card accounts
-        get_accounts(account_type="retirement")  # Case-insensitive, returns retirement accounts
+        get_accounts(account_type="Credit Cards")  # Only credit card accounts
+        get_accounts(account_type="retirement")  # Returns retirement accounts
     """
     try:
         # Get sheets client (singleton)
@@ -94,7 +93,10 @@ def get_accounts(
                     continue
 
                 # Apply optional account_type filter
-                if account_type and account.account_type.upper() != account_type.upper():
+                if (
+                    account_type
+                    and account.account_type.upper() != account_type.upper()
+                ):
                     continue
 
                 accounts.append(account)
@@ -112,7 +114,7 @@ def get_accounts(
                 "display_name": account.display_name,
                 "account_type": account.account_type,
                 "account_number": account.account_number,
-                "is_hidden": account.is_hidden  # Always false in results
+                "is_hidden": account.is_hidden,  # Always false in results
             }
             account_list.append(account_dict)
 
@@ -121,31 +123,33 @@ def get_accounts(
 
     except SheetsClientError as e:
         logger.error(f"Sheets client error: {e}")
-        return json.dumps({
-            "error": "Failed to access Tiller spreadsheet",
-            "message": str(e),
-            "help": "Ensure TILLER_SHEET_ID is set and auth/token.json exists"
-        }, indent=2)
+        return json.dumps(
+            {
+                "error": "Failed to access Tiller spreadsheet",
+                "message": str(e),
+                "help": "Ensure TILLER_SHEET_ID is set and auth/token.json exists",
+            },
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Unexpected error in get_accounts: {e}", exc_info=True)
-        return json.dumps({
-            "error": "Unexpected error occurred",
-            "message": str(e)
-        }, indent=2)
+        return json.dumps(
+            {"error": "Unexpected error occurred", "message": str(e)}, indent=2
+        )
 
 
 @mcp.tool()
 def get_transactions(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    account: Optional[str] = None,
-    category: Optional[str] = None,
-    min_amount: Optional[str] = None,
-    max_amount: Optional[str] = None,
-    description: Optional[str] = None,
-    limit: Optional[int] = 50,
-    offset: Optional[int] = 0
+    start_date: str | None = None,
+    end_date: str | None = None,
+    account: str | None = None,
+    category: str | None = None,
+    min_amount: str | None = None,
+    max_amount: str | None = None,
+    description: str | None = None,
+    limit: int | None = 50,
+    offset: int | None = 0,
 ) -> str:
     """
     Get transactions from Tiller Money with optional filtering.
@@ -163,8 +167,8 @@ def get_transactions(
         max_amount: Filter transactions <= this amount (inclusive). Optional.
                     Supports negative values (expenses are negative).
                     Example: "-100" for large expenses, "50" for small transactions
-        description: Search transaction descriptions (partial match, case-insensitive). Optional.
-                     Searches both Description and Full Description fields.
+        description: Search descriptions (partial, case-insensitive).
+                     Optional. Searches Description and Full Description.
                      Example: "starbucks" finds all Starbucks transactions
         limit: Maximum transactions to return (default 100)
         offset: Skip first N transactions (for pagination, default 0)
@@ -183,45 +187,58 @@ def get_transactions(
         get_transactions(limit=100, offset=100)  # Pagination: next 100
 
         # Advanced filtering examples
-        get_transactions(category="Groceries", min_amount="100")  # Grocery transactions over $100
+        get_transactions(
+            category="Groceries", min_amount="100"
+        )  # Grocery over $100
         get_transactions(
             start_date="12/01/2025",
             end_date="12/31/2025",
             category="Dining",
             min_amount="20",
-            max_amount="50"
-        )  # Dining expenses between $20-$50 in December
+            max_amount="50",
+        )  # Dining between $20-$50 in December
         get_transactions(min_amount="0")  # List all income transactions
-        get_transactions(description="starbucks")  # Find all Starbucks purchases
-        get_transactions(category="Shopping", max_amount="-200")  # Large shopping expenses
+        get_transactions(description="starbucks")  # Find Starbucks
+        get_transactions(
+            category="Shopping", max_amount="-200"
+        )  # Large shopping expenses
     """
     import re
 
     try:
         # Validate date format if provided
-        date_pattern = re.compile(r'^\d{2}/\d{2}/\d{4}$')
+        date_pattern = re.compile(r"^\d{2}/\d{2}/\d{4}$")
         if start_date and not date_pattern.match(start_date):
-            return json.dumps({
-                "error": "Invalid date format",
-                "message": "start_date must be in MM/DD/YYYY format",
-                "provided": start_date
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Invalid date format",
+                    "message": "start_date must be in MM/DD/YYYY format",
+                    "provided": start_date,
+                },
+                indent=2,
+            )
 
         if end_date and not date_pattern.match(end_date):
-            return json.dumps({
-                "error": "Invalid date format",
-                "message": "end_date must be in MM/DD/YYYY format",
-                "provided": end_date
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Invalid date format",
+                    "message": "end_date must be in MM/DD/YYYY format",
+                    "provided": end_date,
+                },
+                indent=2,
+            )
 
         # Validate date range
         if start_date and end_date and start_date > end_date:
-            return json.dumps({
-                "error": "Invalid date range",
-                "message": "start_date must be <= end_date",
-                "start_date": start_date,
-                "end_date": end_date
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Invalid date range",
+                    "message": "start_date must be <= end_date",
+                    "start_date": start_date,
+                    "end_date": end_date,
+                },
+                indent=2,
+            )
 
         # Validate and parse amount parameters
         parsed_min_amount = None
@@ -231,29 +248,41 @@ def get_transactions(
             try:
                 parsed_min_amount = float(min_amount)
             except ValueError:
-                return json.dumps({
-                    "error": "Invalid min_amount format",
-                    "message": f"min_amount must be a valid number, got: {min_amount}",
-                    "examples": ["100", "-50.25", "0"]
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": "Invalid min_amount format",
+                        "message": (f"min_amount must be a number, got: {min_amount}"),
+                        "examples": ["100", "-50.25", "0"],
+                    },
+                    indent=2,
+                )
 
         if max_amount is not None:
             try:
                 parsed_max_amount = float(max_amount)
             except ValueError:
-                return json.dumps({
-                    "error": "Invalid max_amount format",
-                    "message": f"max_amount must be a valid number, got: {max_amount}",
-                    "examples": ["500", "-10.00", "0"]
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": "Invalid max_amount format",
+                        "message": (f"max_amount must be a number, got: {max_amount}"),
+                        "examples": ["500", "-10.00", "0"],
+                    },
+                    indent=2,
+                )
 
         # Validate amount range
         if parsed_min_amount is not None and parsed_max_amount is not None:
             if parsed_min_amount > parsed_max_amount:
-                return json.dumps({
-                    "error": "Invalid amount range",
-                    "message": f"min_amount ({min_amount}) cannot be greater than max_amount ({max_amount})"
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": "Invalid amount range",
+                        "message": (
+                            f"min_amount ({min_amount}) cannot be greater "
+                            f"than max_amount ({max_amount})"
+                        ),
+                    },
+                    indent=2,
+                )
 
         logger.info(
             f"Fetching transactions with filters: "
@@ -272,11 +301,11 @@ def get_transactions(
         # Helper function to convert MM/DD/YYYY to YYYYMMDD for comparison
         def date_to_sortable(date_str):
             try:
-                parts = date_str.split('/')
+                parts = date_str.split("/")
                 if len(parts) == 3:
                     return f"{parts[2]}{parts[0].zfill(2)}{parts[1].zfill(2)}"
                 return date_str
-            except:
+            except Exception:
                 return date_str
 
         # Parse into Transaction objects
@@ -287,14 +316,19 @@ def get_transactions(
 
                 # Apply date filters (convert to sortable format for comparison)
                 if start_date:
-                    if date_to_sortable(transaction.date) < date_to_sortable(start_date):
+                    if date_to_sortable(transaction.date) < date_to_sortable(
+                        start_date
+                    ):
                         continue
                 if end_date:
                     if date_to_sortable(transaction.date) > date_to_sortable(end_date):
                         continue
 
-                # Apply account filter (case-insensitive partial match on account_number)
-                if account and account.upper() not in transaction.account_number.upper():
+                # Apply account filter (case-insensitive partial match)
+                if (
+                    account
+                    and account.upper() not in transaction.account_number.upper()
+                ):
                     continue
 
                 # Filter by category (partial match, case-insensitive)
@@ -302,17 +336,26 @@ def get_transactions(
                     continue
 
                 # Filter by minimum amount (inclusive)
-                if parsed_min_amount is not None and transaction.amount < parsed_min_amount:
+                if (
+                    parsed_min_amount is not None
+                    and transaction.amount < parsed_min_amount
+                ):
                     continue
 
                 # Filter by maximum amount (inclusive)
-                if parsed_max_amount is not None and transaction.amount > parsed_max_amount:
+                if (
+                    parsed_max_amount is not None
+                    and transaction.amount > parsed_max_amount
+                ):
                     continue
 
                 # Search description (both fields, partial match, case-insensitive)
                 if description:
                     desc_upper = description.upper()
-                    if desc_upper not in transaction.description.upper() and desc_upper not in transaction.full_description.upper():
+                    if (
+                        desc_upper not in transaction.description.upper()
+                        and desc_upper not in transaction.full_description.upper()
+                    ):
                         continue
 
                 transactions.append(transaction)
@@ -327,7 +370,7 @@ def get_transactions(
         # Convert MM/DD/YYYY to YYYYMMDD for proper string sorting
         def date_sort_key(t):
             try:
-                parts = t.date.split('/')
+                parts = t.date.split("/")
                 if len(parts) == 3:
                     # Convert MM/DD/YYYY to YYYYMMDD with zero-padding
                     month = parts[0].zfill(2)
@@ -335,13 +378,13 @@ def get_transactions(
                     year = parts[2]
                     return f"{year}{month}{day}"
                 return t.date
-            except:
+            except Exception:
                 return t.date
 
         transactions.sort(key=date_sort_key, reverse=True)
 
         # Apply pagination
-        paginated = transactions[offset:offset+limit]
+        paginated = transactions[offset : offset + limit]
         logger.info(f"Returning {len(paginated)} transactions after pagination")
 
         # Convert to JSON-serializable format
@@ -360,7 +403,7 @@ def get_transactions(
                 "week": t.week,
                 "transaction_id": t.transaction_id,
                 "check_number": t.check_number,
-                "full_description": t.full_description
+                "full_description": t.full_description,
             }
             transaction_list.append(transaction_dict)
 
@@ -368,24 +411,24 @@ def get_transactions(
 
     except SheetsClientError as e:
         logger.error(f"Sheets client error: {e}")
-        return json.dumps({
-            "error": "Failed to access Tiller spreadsheet",
-            "message": str(e),
-            "help": "Ensure TILLER_SHEET_ID is set and auth/token.json exists"
-        }, indent=2)
+        return json.dumps(
+            {
+                "error": "Failed to access Tiller spreadsheet",
+                "message": str(e),
+                "help": "Ensure TILLER_SHEET_ID is set and auth/token.json exists",
+            },
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Unexpected error in get_transactions: {e}", exc_info=True)
-        return json.dumps({
-            "error": "Unexpected error occurred",
-            "message": str(e)
-        }, indent=2)
+        return json.dumps(
+            {"error": "Unexpected error occurred", "message": str(e)}, indent=2
+        )
 
 
 @mcp.tool()
-def get_transaction_details(
-    transaction_id: str
-) -> str:
+def get_transaction_details(transaction_id: str) -> str:
     """
     Get full details for a single transaction by ID.
 
@@ -402,13 +445,16 @@ def get_transaction_details(
 
     try:
         # Validate transaction_id format
-        if not re.match(r'^[a-f0-9]{24}$', transaction_id):
-            return json.dumps({
-                "error": "Invalid transaction_id format",
-                "message": "transaction_id must be a 24-character hexadecimal string",
-                "provided": transaction_id,
-                "example": "123abc456def789012345678"
-            }, indent=2)
+        if not re.match(r"^[a-f0-9]{24}$", transaction_id):
+            return json.dumps(
+                {
+                    "error": "Invalid transaction_id format",
+                    "message": ("transaction_id must be a 24-character hex string"),
+                    "provided": transaction_id,
+                    "example": "123abc456def789012345678",
+                },
+                indent=2,
+            )
 
         logger.info(f"Fetching transaction details for ID: {transaction_id}")
         client = get_sheets_client()
@@ -437,7 +483,7 @@ def get_transaction_details(
                         "week": transaction.week,
                         "transaction_id": transaction.transaction_id,
                         "check_number": transaction.check_number,
-                        "full_description": transaction.full_description
+                        "full_description": transaction.full_description,
                     }
                     logger.info(f"Found transaction: {transaction.description}")
                     return json.dumps(transaction_dict, indent=2)
@@ -448,32 +494,34 @@ def get_transaction_details(
 
         # Not found
         logger.warning(f"Transaction not found: {transaction_id}")
-        return json.dumps({
-            "error": "Transaction not found",
-            "transaction_id": transaction_id
-        }, indent=2)
+        return json.dumps(
+            {"error": "Transaction not found", "transaction_id": transaction_id},
+            indent=2,
+        )
 
     except SheetsClientError as e:
         logger.error(f"Sheets client error: {e}")
-        return json.dumps({
-            "error": "Failed to access Tiller spreadsheet",
-            "message": str(e),
-            "help": "Ensure TILLER_SHEET_ID is set and auth/token.json exists"
-        }, indent=2)
+        return json.dumps(
+            {
+                "error": "Failed to access Tiller spreadsheet",
+                "message": str(e),
+                "help": "Ensure TILLER_SHEET_ID is set and auth/token.json exists",
+            },
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Unexpected error in get_transaction_details: {e}", exc_info=True)
-        return json.dumps({
-            "error": "Unexpected error occurred",
-            "message": str(e)
-        }, indent=2)
+        return json.dumps(
+            {"error": "Unexpected error occurred", "message": str(e)}, indent=2
+        )
 
 
 @mcp.tool()
 def get_categories(
-    category_type: Optional[str] = None,
-    group: Optional[str] = None,
-    include_monthly_budgets: bool = False
+    category_type: str | None = None,
+    group: str | None = None,
+    include_monthly_budgets: bool = False,
 ) -> str:
     """
     Get all categories from Tiller Money with optional filtering and budget data.
@@ -489,15 +537,16 @@ def get_categories(
         group: Optional filter by category group (partial match, case-insensitive).
                Examples: "Living", "Fun", "Primary Income", "Expense"
                If not specified, returns all groups.
-        include_monthly_budgets: If True, include monthly budget amounts for each category.
-                                Default: False (backward compatible).
+        include_monthly_budgets: If True, include monthly budget amounts for
+                                 each category. Default: False.
 
     Returns:
         JSON string containing array of category objects. Each category includes:
         - category: Category name (unique identifier)
         - group: Category group/classification
         - type: Category type (Expense/Income/Transfer)
-        - monthly_budgets: (if include_monthly_budgets=True) Dictionary with months as keys:
+        - monthly_budgets: (if include_monthly_budgets=True) Dictionary
+                           with months as keys:
           - Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
           - Each value contains: {"amount": float, "amount_str": string}
 
@@ -505,30 +554,40 @@ def get_categories(
         get_categories()  # Returns all categories (basic info only)
         get_categories(category_type="Expense")  # Returns only expense categories
         get_categories(include_monthly_budgets=True)  # All categories with budget data
-        get_categories(category_type="Expense", include_monthly_budgets=True)  # Expense categories with budgets
+        get_categories(
+            category_type="Expense", include_monthly_budgets=True
+        )  # Expense categories with budgets
 
     Budget Analysis Workflow:
-        1. Call get_categories(include_monthly_budgets=True) to get budgeted amounts
-        2. Call get_transactions(start_date="01/01/2025", end_date="01/31/2025", category="Groceries")
+        1. Call get_categories(include_monthly_budgets=True)
+        2. Call get_transactions(
+               start_date="01/01/2025",
+               end_date="01/31/2025",
+               category="Groceries"
+           )
         3. Sum transaction amounts to get actual spending
         4. Compare budget vs. actual for the category
     """
     try:
         logger.info(
-            f"Fetching categories with filters: "
-            f"category_type={category_type}, group={group}, include_monthly_budgets={include_monthly_budgets}"
+            f"Fetching categories with filters: category_type={category_type}, "
+            f"group={group}, include_monthly_budgets={include_monthly_budgets}"
         )
         client = get_sheets_client()
 
         # Fetch raw category data (with or without monthly budgets)
-        raw_categories = client.get_categories_raw(include_monthly_budgets=include_monthly_budgets)
+        raw_categories = client.get_categories_raw(
+            include_monthly_budgets=include_monthly_budgets
+        )
         logger.info(f"Retrieved {len(raw_categories)} raw category rows")
 
         # Parse into Category objects
         categories = []
         for row in raw_categories:
             try:
-                category = Category.from_sheet_row(row, include_monthly_budgets=include_monthly_budgets)
+                category = Category.from_sheet_row(
+                    row, include_monthly_budgets=include_monthly_budgets
+                )
 
                 # Apply category_type filter (case-insensitive exact match)
                 if category_type and category.type.upper() != category_type.upper():
@@ -552,7 +611,7 @@ def get_categories(
             category_dict = {
                 "category": cat.category,
                 "group": cat.group,
-                "type": cat.type
+                "type": cat.type,
             }
             if include_monthly_budgets and cat.monthly_budgets:
                 category_dict["monthly_budgets"] = cat.monthly_budgets
@@ -562,18 +621,20 @@ def get_categories(
 
     except SheetsClientError as e:
         logger.error(f"Sheets client error: {e}")
-        return json.dumps({
-            "error": "Failed to access Tiller spreadsheet",
-            "message": str(e),
-            "help": "Ensure TILLER_SHEET_ID is set and auth/token.json exists"
-        }, indent=2)
+        return json.dumps(
+            {
+                "error": "Failed to access Tiller spreadsheet",
+                "message": str(e),
+                "help": "Ensure TILLER_SHEET_ID is set and auth/token.json exists",
+            },
+            indent=2,
+        )
 
     except Exception as e:
         logger.error(f"Unexpected error in get_categories: {e}", exc_info=True)
-        return json.dumps({
-            "error": "Unexpected error occurred",
-            "message": str(e)
-        }, indent=2)
+        return json.dumps(
+            {"error": "Unexpected error occurred", "message": str(e)}, indent=2
+        )
 
 
 def main():
@@ -581,7 +642,7 @@ def main():
     logger.info("Starting Tiller Money MCP Server...")
 
     # Verify environment is configured
-    if not os.environ.get('TILLER_SHEET_ID'):
+    if not os.environ.get("TILLER_SHEET_ID"):
         logger.warning("TILLER_SHEET_ID environment variable not set")
         logger.warning("Server will fail when tools are called without this variable")
 

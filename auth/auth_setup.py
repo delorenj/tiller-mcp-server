@@ -11,6 +11,7 @@ Usage:
 
 import os
 from pathlib import Path
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -20,9 +21,10 @@ from googleapiclient.errors import HttpError
 # Try to load .env file if python-dotenv is available
 try:
     from dotenv import load_dotenv
+
     # Load .env from project root (parent of auth directory)
     project_root = Path(__file__).parent.parent
-    env_path = project_root / '.env'
+    env_path = project_root / ".env"
     if env_path.exists():
         load_dotenv(env_path)
         print(f"✓ Loaded environment variables from {env_path}")
@@ -30,12 +32,12 @@ except ImportError:
     pass  # python-dotenv not installed, will use system environment variables
 
 # Define the scopes for Google Sheets API
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 # Get the directory where this script is located
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CREDENTIALS_PATH = os.path.join(SCRIPT_DIR, 'credentials.json')
-TOKEN_PATH = os.path.join(SCRIPT_DIR, 'token.json')
+CREDENTIALS_PATH = os.path.join(SCRIPT_DIR, "credentials.json")
+TOKEN_PATH = os.path.join(SCRIPT_DIR, "token.json")
 
 
 def authenticate_google_sheets():
@@ -59,7 +61,10 @@ def authenticate_google_sheets():
             try:
                 creds.refresh(Request())
             except Exception as e:
-                print(f"Token refresh failed ({e}), deleting token and re-authenticating...")
+                print(
+                    f"Token refresh failed ({e}), "
+                    "deleting token and re-authenticating..."
+                )
                 os.remove(TOKEN_PATH)
                 creds = None
         if not creds:
@@ -74,19 +79,18 @@ def authenticate_google_sheets():
 
             print(f"Starting authentication flow using {CREDENTIALS_PATH}")
             print("A browser window will open for authorization...")
-            flow = InstalledAppFlow.from_client_secrets_file(
-                CREDENTIALS_PATH, SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
             creds = flow.run_local_server(port=0)
 
         # Save credentials for next run
         print(f"Saving credentials to {TOKEN_PATH}")
-        with open(TOKEN_PATH, 'w') as token:
+        with open(TOKEN_PATH, "w") as token:
             token.write(creds.to_json())
         print("✓ Credentials saved successfully")
     else:
         print("✓ Existing credentials are valid")
 
-    return build('sheets', 'v4', credentials=creds)
+    return build("sheets", "v4", credentials=creds)
 
 
 def test_connection(service, spreadsheet_id=None):
@@ -99,16 +103,19 @@ def test_connection(service, spreadsheet_id=None):
     """
     if not spreadsheet_id:
         print("\nNo spreadsheet ID provided. Skipping connection test.")
-        print("To test with your Tiller spreadsheet, set TILLER_SHEET_ID environment variable")
+        print(
+            "To test with your Tiller spreadsheet, set the "
+            "TILLER_SHEET_ID environment variable"
+        )
         return
 
     try:
         print(f"\nTesting connection to spreadsheet: {spreadsheet_id}")
         spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
         print(f"✓ Successfully connected to: {spreadsheet['properties']['title']}")
-        print(f"\nAvailable sheets:")
-        for sheet in spreadsheet['sheets']:
-            props = sheet['properties']
+        print("\nAvailable sheets:")
+        for sheet in spreadsheet["sheets"]:
+            props = sheet["properties"]
             print(f"  - {props['title']} ({props['gridProperties']['rowCount']} rows)")
     except HttpError as error:
         print(f"✗ Error testing connection: {error}")
@@ -131,7 +138,7 @@ def main():
     print("\n✓ Authentication successful!")
 
     # Test connection if TILLER_SHEET_ID is set
-    spreadsheet_id = os.environ.get('TILLER_SHEET_ID')
+    spreadsheet_id = os.environ.get("TILLER_SHEET_ID")
     test_connection(service, spreadsheet_id)
 
     print("\n" + "=" * 60)

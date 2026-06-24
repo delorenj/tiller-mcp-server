@@ -1,0 +1,310 @@
+diff --git a/README.md b/README.md
+index 10839e9..906d213 100644
+--- a/README.md
++++ b/README.md
+@@ -8,15 +8,21 @@
+ 
+ 1. **Clone this repository**:
+    ```bash
+-   git clone https://github.com/jackstein21/tiller-mcp-server.git
+-   cd tiller_mcp
++   git clone https://github.com/delorenj/tiller-mcp-server.git
++   cd tiller-mcp-server
+    ```
+ 
+ 2. **Set up Python environment**:
+-   ```bash
+-   # Using conda (recommended)
+-   conda create -n tiller_mcp python=3.12
+-   conda activate tiller_mcp
+-
+-   # Install dependencies
+-   pip install -r requirements.txt
+-   ```
++   This project uses `mise` for toolchain management (Python, Node.js) and 1Password secret injection, and `uv` for Python virtual environment and dependency management.
++
++   First, install the required toolchains (Python, Node) via `mise`:
++   ```bash
++   mise install
++   ```
++   *Note: On directory enter/switch, `mise` will automatically inject secrets from `.env.op` into your `.env` file using the 1Password CLI (`op`).*
++
++   Next, set up the Python virtual environment and install all dependencies:
++   ```bash
++   # Sync virtual environment and dependencies using uv
++   uv sync
++   ```
+ 
+ 3. **Set up Google Cloud Project**:
+ 
+@@ -36,7 +42,7 @@
+ 4. **Authenticate with Google Sheets**:
+    ```bash
+    # Run the authentication setup script
+-   python auth/auth_setup.py
++   uv run auth/auth_setup.py
+    ```
+ 
+    Follow the prompts:
+@@ -52,19 +58,16 @@
+ 
+    **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+ 
++   Using `uv` with the project directory is recommended for a clean, platform-independent configuration:
++
+    ```json
+    {
+      "mcpServers": {
+        "Tiller Money": {
+-         "command": "/opt/anaconda3/envs/tiller_mcp/bin/python",
++         "command": "uv",
+          "args": [
+-           "/path/to/your/tiller_mcp/src/tiller_mcp_server/server.py"
++           "--directory",
++           "/path/to/your/tiller-mcp-server",
++           "run",
++           "tiller-mcp-server"
+          ],
+          "env": {
+            "TILLER_SHEET_ID": "your_tiller_spreadsheet_id_here"
+@@ -73,30 +76,27 @@
+      }
+    }
+    ```
+ 
+    **Important**:
+-   - Replace `/path/to/your/tiller_mcp` with your actual project path
++   - Replace `/path/to/your/tiller-mcp-server` with your actual project path
+    - Replace `your_tiller_spreadsheet_id_here` with your Tiller spreadsheet ID
+-   - If not using conda, update the `command` path to your Python interpreter
+ 
+ 6. **Get your Tiller Spreadsheet ID**:
+    - Open your Tiller spreadsheet in Google Sheets
+    - Copy the ID from the URL: `https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit`
+ 
+ 7. **Restart Claude Desktop**
+ 
+ ---
+@@ -282,15 +282,14 @@
+-tiller_mcp/
++tiller-mcp-server/
+ ├── auth/
+ │   ├── credentials.json        # OAuth credentials (gitignored)
+ │   ├── token.json             # OAuth token (gitignored)
+ │   └── auth_setup.py          # Authentication setup script
+ ├── src/tiller_mcp_server/
+ │   ├── __init__.py            # Package initialization
+ │   ├── server.py              # Main MCP server (FastMCP)
+ │   ├── sheets_client.py       # Google Sheets API wrapper
+ │   └── tiller_schema.py       # Pydantic models
+ ├── config.json                # Example Claude Desktop config
+-├── requirements.txt           # Python dependencies
+ ├── PRD.md                     # Product Requirements Document
+ └── README.md                  # This documentation
+ 
+@@ -328,17 +327,17 @@
+ 
+ **Error**: "Token file not found"
+ - **Solution**: Run `python auth/auth_setup.py` to create authentication token
++- **Solution**: Run `uv run auth/auth_setup.py` to create authentication token
+ 
+ **Error**: "Credentials are invalid and cannot be refreshed"
+ - **Solution**: Re-run authentication: `python auth/auth_setup.py`
++- **Solution**: Re-run authentication: `uv run auth/auth_setup.py`
+ 
+ ### Server Connection Issues
+ 
+ **Error**: "Server transport closed unexpectedly" in Claude Desktop
+ - **Solution**: Check that the Python path in config is correct
+- - **Solution**: Verify all dependencies are installed: `pip install -r requirements.txt`
+- - **Solution**: Test server manually: `python src/tiller_mcp_server/server.py`
++ - **Solution**: Verify all dependencies are installed: `uv sync`
++ - **Solution**: Test server manually: `uv run tiller-mcp-server`
+ 
+ ### Data Issues
+ 
+@@ -350,11 +349,11 @@
+ | Error | Solution |
+ |-------|----------|
+-| "No valid session found" | Run `python auth/auth_setup.py` |
++| "No valid session found" | Run `uv run auth/auth_setup.py` |
+ | "Spreadsheet not found" | Verify `TILLER_SHEET_ID` in config |
+ | "Permission denied" | Re-run auth setup to grant Sheets access |
+ | "Invalid credentials" | Check `auth/credentials.json` exists |
+ 
+ ---
+ 
+ ## Development
+@@ -361,7 +360,7 @@
+ ### Testing
+ ```bash
+ # Test server manually
+-python src/tiller_mcp_server/server.py
++uv run tiller-mcp-server
+ 
+ # Server logs to stderr (visible in Claude Desktop logs)
+ ```
+@@ -423,7 +422,7 @@
+ For issues, follow these troubleshooting steps:
+-1. Check authentication: `python auth/auth_setup.py`
++1. Check authentication: `uv run auth/auth_setup.py`
+ 2. Verify configuration: Ensure `TILLER_SHEET_ID` is set in Claude Desktop config
+-3. Test server manually: `python src/tiller_mcp_server/server.py`
++3. Test server manually: `uv run tiller-mcp-server`
+ 4. Review logs: Claude Desktop logs show server stderr output
+ 5. Report issues on GitHub with error details and logs
+diff --git a/AGENTS.md b/AGENTS.md
+index 10839e9..906d213 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -8,15 +8,21 @@
+ 
+ 1. **Clone this repository**:
+    ```bash
+-   git clone https://github.com/jackstein21/tiller-mcp-server.git
+-   cd tiller_mcp
++   git clone https://github.com/delorenj/tiller-mcp-server.git
++   cd tiller-mcp-server
+    ```
+ 
+ 2. **Set up Python environment**:
+-   ```bash
+-   # Using conda (recommended)
+-   conda create -n tiller_mcp python=3.12
+-   conda activate tiller_mcp
+-
+-   # Install dependencies
+-   pip install -r requirements.txt
+-   ```
++   This project uses `mise` for toolchain management (Python, Node.js) and 1Password secret injection, and `uv` for Python virtual environment and dependency management.
++
++   First, install the required toolchains (Python, Node) via `mise`:
++   ```bash
++   mise install
++   ```
++   *Note: On directory enter/switch, `mise` will automatically inject secrets from `.env.op` into your `.env` file using the 1Password CLI (`op`).*
++
++   Next, set up the Python virtual environment and install all dependencies:
++   ```bash
++   # Sync virtual environment and dependencies using uv
++   uv sync
++   ```
+ 
+ 3. **Set up Google Cloud Project**:
+ 
+@@ -36,7 +42,7 @@
+ 4. **Authenticate with Google Sheets**:
+    ```bash
+    # Run the authentication setup script
+-   python auth/auth_setup.py
++   uv run auth/auth_setup.py
+    ```
+ 
+    Follow the prompts:
+@@ -52,19 +58,16 @@
+ 
+    **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+ 
++   Using `uv` with the project directory is recommended for a clean, platform-independent configuration:
++
+    ```json
+    {
+      "mcpServers": {
+        "Tiller Money": {
+-         "command": "/opt/anaconda3/envs/tiller_mcp/bin/python",
++         "command": "uv",
+          "args": [
+-           "/path/to/your/tiller_mcp/src/tiller_mcp_server/server.py"
++           "--directory",
++           "/path/to/your/tiller-mcp-server",
++           "run",
++           "tiller-mcp-server"
+          ],
+          "env": {
+            "TILLER_SHEET_ID": "your_tiller_spreadsheet_id_here"
+@@ -73,30 +76,27 @@
+      }
+    }
+    ```
+ 
+    **Important**:
+-   - Replace `/path/to/your/tiller_mcp` with your actual project path
++   - Replace `/path/to/your/tiller-mcp-server` with your actual project path
+    - Replace `your_tiller_spreadsheet_id_here` with your Tiller spreadsheet ID
+-   - If not using conda, update the `command` path to your Python interpreter
+ 
+ 6. **Get your Tiller Spreadsheet ID**:
+    - Open your Tiller spreadsheet in Google Sheets
+    - Copy the ID from the URL: `https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit`
+ 
+ 7. **Restart Claude Desktop**
+ 
+ ---
+@@ -282,15 +282,14 @@
+-tiller_mcp/
++tiller-mcp-server/
+ ├── auth/
+ │   ├── credentials.json        # OAuth credentials (gitignored)
+ │   ├── token.json             # OAuth token (gitignored)
+ │   └── auth_setup.py          # Authentication setup script
+ ├── src/tiller_mcp_server/
+ │   ├── __init__.py            # Package initialization
+ │   ├── server.py              # Main MCP server (FastMCP)
+ │   ├── sheets_client.py       # Google Sheets API wrapper
+ │   └── tiller_schema.py       # Pydantic models
+ ├── config.json                # Example Claude Desktop config
+-├── requirements.txt           # Python dependencies
+ ├── PRD.md                     # Product Requirements Document
+ └── README.md                  # This documentation
+ 
+@@ -328,17 +327,17 @@
+ 
+ **Error**: "Token file not found"
+ - **Solution**: Run `python auth/auth_setup.py` to create authentication token
++- **Solution**: Run `uv run auth/auth_setup.py` to create authentication token
+ 
+ **Error**: "Credentials are invalid and cannot be refreshed"
+ - **Solution**: Re-run authentication: `python auth/auth_setup.py`
++- **Solution**: Re-run authentication: `uv run auth/auth_setup.py`
+ 
+ ### Server Connection Issues
+ 
+ **Error**: "Server transport closed unexpectedly" in Claude Desktop
+ - **Solution**: Check that the Python path in config is correct
+- - **Solution**: Verify all dependencies are installed: `pip install -r requirements.txt`
+- - **Solution**: Test server manually: `python src/tiller_mcp_server/server.py`
++ - **Solution**: Verify all dependencies are installed: `uv sync`
++ - **Solution**: Test server manually: `uv run tiller-mcp-server`
+ 
+ ### Data Issues
+ 
+@@ -350,11 +349,11 @@
+ | Error | Solution |
+ |-------|----------|
+-| "No valid session found" | Run `python auth/auth_setup.py` |
++| "No valid session found" | Run `uv run auth/auth_setup.py` |
+ | "Spreadsheet not found" | Verify `TILLER_SHEET_ID` in config |
+ | "Permission denied" | Re-run auth setup to grant Sheets access |
+ | "Invalid credentials" | Check `auth/credentials.json` exists |
+ 
+ ---
+ 
+ ## Development
+@@ -361,7 +360,7 @@
+ ### Testing
+ ```bash
+ # Test server manually
+-python src/tiller_mcp_server/server.py
++uv run tiller-mcp-server
+ 
+ # Server logs to stderr (visible in Claude Desktop logs)
+ ```
+@@ -423,7 +422,7 @@
+ For issues, follow these troubleshooting steps:
+-1. Check authentication: `python auth/auth_setup.py`
++1. Check authentication: `uv run auth/auth_setup.py`
+ 2. Verify configuration: Ensure `TILLER_SHEET_ID` is set in Claude Desktop config
+-3. Test server manually: `python src/tiller_mcp_server/server.py`
++3. Test server manually: `uv run tiller-mcp-server`
+ 4. Review logs: Claude Desktop logs show server stderr output
+ 5. Report issues on GitHub with error details and logs

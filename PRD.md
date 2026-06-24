@@ -358,7 +358,7 @@ Tasks completed:
 - Read only 4 columns from Accounts sheet (A-D)
 - Account number extracted from display_name via parsing
 - Hidden accounts ALWAYS excluded (no option to include them)
-- Uses conda Python environment for deployment
+- Uses uv and mise for development and deployment
 
 ### Phase 3: Transaction Tools (Complete)
 
