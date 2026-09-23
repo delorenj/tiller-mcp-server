@@ -38,3 +38,6 @@ dist/
 GEMINI.md
 .agents/local.json
 .kimi-code/
+
+# Canonical agent config lives in .agents; generated skill projections stay local.
+/.agents/skills
